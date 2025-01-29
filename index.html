@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SAIC Galleries Exhibition Label Generator</title>
+    <style>
+      html, body {
+        height: 100vh; 
+        overflow: hidden; 
+        font-family: Calibri, sans-serif;
+        margin: 20px;
+        display: flex;
+        flex-direction: column; 
+      }
+
+      .form-and-preview {
+        display: flex;
+        flex-direction: row; 
+        align-items: flex-start; 
+        gap: 20px; 
+        width: 100%; 
+      }
+
+      h1 {
+        position: sticky;
+        top: 0;
+        background-color: white;
+        z-index: 10;
+        margin: 0 0 20px 0; 
+        text-align: left;
+        width: 100%; 
+      }
+
+      h3 {
+        margin: 5px 0; 
+      }
+
+      .form-container {
+        flex: 1; 
+        max-height: calc(100vh - 60px); 
+        overflow-y: auto; 
+        padding-right: 10px;
+        padding-bottom: 80px;
+        box-sizing: border-box;
+      }
+
+      .preview-container {
+        flex: 0 0 auto; 
+        max-height: calc(100vh - 60px); 
+        overflow-y: auto; 
+        padding-left: 10px; 
+        padding-bottom: 100px; 
+        box-sizing: border-box;
+      }
+
+      .preview {
+        width: 624px; 
+        min-height: 192px;
+        margin: 0 auto; 
+        border: 1px solid #ddd;
+        padding: 50px;
+        background-color: white;
+        font-family: Calibri, sans-serif;
+        line-height: 1.2;
+        word-wrap: break-word;
+      }
+
+      .preview .name {
+        font-weight: bold;
+        font-size: 26pt;
+        margin-bottom: 0; 
+      }
+
+      .preview .name.multi-artwork {
+        margin-bottom: 12pt; 
+      }
+
+      .preview .name.single-artwork {
+        margin-bottom: 0; 
+      }
+
+      .preview .viewing-order {
+        font-size: 18pt;
+        font-style: italic;
+        margin-bottom: 12pt; 
+      }
+
+      .preview .artwork {
+        margin-bottom: 12px; 
+      }
+
+      .preview .title-year {
+        font-size: 22pt;
+      }
+
+      .preview .title-year .title {
+        font-style: italic;
+      }
+
+      .preview .materials,
+      .preview .duration {
+        font-size: 22pt;
+      }
+
+      .preview .didactic {
+        font-size: 22pt;
+        margin-top: 12px; 
+        white-space: pre-wrap;
+      }
+
+      .preview .credits {
+        font-size: 18pt;
+        margin-top: 12pt;
+        white-space: pre-wrap;
+      }
+
+      .preview .credits p {
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+
+      .buttons {
+        margin-top: 20px;
+        text-align: center;
+      }
+
+      button {
+        padding: 10px 15px;
+        font-size: 14px;
+        margin-right: 10px;
+        cursor: pointer;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      textarea {
+        font-size: 18px;
+        padding: 10px;
+        width: 80%;
+        margin-bottom: 5px; 
+      }
+
+      select {
+        font-size: 18px;
+        padding: 10px;
+        width: 30%;
+        margin-bottom: 5px; 
+      }
+
+      select:invalid {
+        color: grey;
+      }
+
+      textarea {
+        font-family: Calibri, sans-serif;
+        font-size: 20px;
+        padding: 10px;
+        width: 80%;
+        margin-bottom: 5px;
+        height: 150px;
+      }
+
+      #artworks-container {
+        margin-top: 10px;
+      }
+
+      .artwork-form {
+        margin-bottom: 30px; 
+      }
+
+      .error {
+        color: red;
+        font-size: 14px;
+        margin-left: 0;
+        display: block;
+        margin-top: 5px;
+        margin-bottom: 5px;
+      }
+
+      .preview p {
+        margin-top: 12pt;
+        margin-bottom: 12pt;
+      }
+
+      .duration-container {
+        display: flex;
+        align-items: center;
+      }
+
+      .duration-container input {
+        width: 50px;
+        margin-right: 5px;
+      }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+
+    <script>
+      let durationValidity = {};
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const numArtworksSelect = document.getElementById("num-artworks");
+
+        numArtworksSelect.addEventListener("change", () => {
+          const numArtworks = parseInt(numArtworksSelect.value, 10);
+          const artworksContainer = document.getElementById("artworks-container");
+          const viewingOrderContainer = document.getElementById("viewing-order-container");
+          const artistName = document.getElementById("artist-name")?.value || "";
+          const didactic = document.getElementById("didactic")?.value || "";
+          const credits = document.getElementById("credits")?.value || "";
+          const viewingOrder = document.getElementById("viewing-order")?.value || "";
+
+          const artworksData = [];
+          for (let i = 1; i <= artworksContainer.children.length; i++) {
+            const formBlock = artworksContainer.children[i - 1];
+            if (!formBlock) continue;
+
+            const t = document.getElementById(`title-${i}`)?.value || "";
+            const y = document.getElementById(`year-${i}`)?.value || "";
+            const m = document.getElementById(`materials-${i}`)?.value || "";
+            const dm = document.getElementById(`duration-minutes-${i}`)?.value || "";
+            const ds = document.getElementById(`duration-seconds-${i}`)?.value || "";
+
+            artworksData.push({
+              title: t,
+              year: y,
+              materials: m,
+              durationMinutes: dm,
+              durationSeconds: ds,
+            });
+          }
+
+          artworksContainer.innerHTML = "";
+
+          if (numArtworks > 1) {
+            viewingOrderContainer.innerHTML = `
+              <label for="viewing-order">Describe viewing order (e.g., From left to right)*</label><br>
+              <input type="text" id="viewing-order" placeholder="Viewing Order" value="${viewingOrder}" oninput="updatePreview(); clearErrorMessage('viewing-order');" required>
+              <span id="error-viewing-order" class="error"></span>
+              <br>
+            `;
+          } else {
+            viewingOrderContainer.innerHTML = "";
+          }
+
+          durationValidity = {};
+
+          for (let i = 1; i <= numArtworks; i++) {
+            const artworkData = artworksData[i - 1] || {};
+            const title = artworkData.title || "";
+            const year = artworkData.year || "";
+            const materials = artworkData.materials || "";
+            const durationMinutes = artworkData.durationMinutes || "";
+            const durationSeconds = artworkData.durationSeconds || "";
+
+            durationValidity[i] = true;
+
+            const artworkHeader = numArtworks > 1 ? `<h3>Artwork ${i}</h3>` : "";
+            artworksContainer.innerHTML += `
+              <div class="artwork-form">
+                ${artworkHeader}
+
+                <label for="title-${i}">Title*</label><br>
+                <input type="text" id="title-${i}" placeholder="Artwork Title" oninput="updatePreview(); clearErrorMessage('title-${i}');" value="${title}" required>
+                <span id="error-title-${i}" class="error"></span>
+                <br>
+
+                <label for="year-${i}">Year*</label><br>
+                <input type="text" id="year-${i}" placeholder="Year of Creation" oninput="updatePreview(); clearErrorMessage('year-${i}');" value="${year}" required>
+                <span id="error-year-${i}" class="error"></span>
+                <br>
+
+                <label for="materials-${i}">Materials*</label><br>
+                <input type="text" id="materials-${i}" placeholder="Materials Used" oninput="updatePreview(); clearErrorMessage('materials-${i}');" value="${materials}" required>
+                <span id="error-materials-${i}" class="error"></span>
+                <br>
+
+                <label for="duration-${i}">Duration (Optional, only for time-based works):</label><br>
+                <div class="duration-container">
+                  <input type="number" id="duration-minutes-${i}" placeholder="Min" oninput="validateDuration(${i});" value="${durationMinutes}" min="0">
+                  :
+                  <input type="number" id="duration-seconds-${i}" placeholder="Sec" oninput="validateDuration(${i});" value="${durationSeconds}" min="0" max="59"> mins
+                </div>
+                <span id="error-duration-${i}" class="error"></span>
+              </div>
+            `;
+          }
+
+          let additionalInfoHeading = "";
+          if (numArtworks > 1) {
+            additionalInfoHeading = `<h3>Additional info</h3>`;
+          }
+
+          artworksContainer.innerHTML += `
+            ${additionalInfoHeading}
+            <label for="didactic">Didactic (Optional, max 80 words):</label><br>
+            <textarea id="didactic" placeholder="Short description of ALL works above to add context" oninput="updatePreview(); checkDidacticWordCount();">${didactic}</textarea>
+            <span id="error-didactic" class="error"></span>
+            <br>
+
+            <label for="credits">Credits / Links (Optional, Instagram handles in format "@username"):</label><br>
+            <textarea id="credits" placeholder="Collaborators, websites, social media, etc." oninput="updatePreview(); checkCreditsWordCount();">${credits}</textarea>
+            <span id="error-credits" class="error"></span>
+            <br>
+          `;
+
+          updatePreview();
+        });
+      });
+
+      function clearErrorMessage(fieldId) {
+        const errorElement = document.getElementById("error-" + fieldId);
+        if (errorElement) {
+          errorElement.textContent = "";
+        }
+      }
+
+      function countWords(str) {
+        let cleaned = str.replace(/\n+/g, ' ');
+        cleaned = cleaned.replace(/\s+/g, ' ');
+        cleaned = cleaned.trim();
+        if (!cleaned) return 0;
+        return cleaned.split(' ').length;
+      }
+
+      function checkDidacticWordCount() {
+        const didacticField = document.getElementById('didactic');
+        const errorDidactic = document.getElementById('error-didactic');
+        const didacticWordCount = countWords(didacticField.value);
+        if (didacticWordCount > 80) {
+          errorDidactic.textContent = 'Didactic cannot exceed 80 words.';
+        } else {
+          errorDidactic.textContent = '';
+        }
+      }
+
+      function checkCreditsWordCount() {
+        const creditsField = document.getElementById('credits');
+        const errorCredits = document.getElementById('error-credits');
+        const creditsWordCount = countWords(creditsField.value);
+        if (creditsWordCount > 80) {
+          errorCredits.textContent = 'Credits cannot exceed 80 words.';
+        } else {
+          errorCredits.textContent = '';
+        }
+      }
+
+      function validateDuration(index) {
+        const minutesField = document.getElementById(`duration-minutes-${index}`);
+        const secondsField = document.getElementById(`duration-seconds-${index}`);
+        const errorSpan = document.getElementById(`error-duration-${index}`);
+
+        minutesField.value = minutesField.value.replace(/\D/g, "");
+        secondsField.value = secondsField.value.replace(/\D/g, "");
+
+        const seconds = parseInt(secondsField.value, 10);
+
+        if (secondsField.value && (seconds < 0 || seconds > 59)) {
+          errorSpan.textContent = "Seconds must be between 0 and 59.";
+          durationValidity[index] = false; 
+        } else {
+          errorSpan.textContent = "";
+          durationValidity[index] = true;
+        }
+
+        updatePreview();
+      }
+
+      function sanitizeParagraphs(input) {
+        const trimmedInput = input.trim();
+
+        const sanitizedInput = trimmedInput.replace(/\n{2,}/g, '\n');
+
+        const paragraphs = sanitizedInput.split('\n').map(para => `<p>${para.trim()}</p>`);
+
+        return paragraphs.join('');
+      }
+
+      function updatePreview() {
+        const artistName = document.getElementById("artist-name").value;
+        const viewingOrderInput = document.getElementById("viewing-order")?.value || "";
+        const didacticField = document.getElementById("didactic");
+        const creditsField = document.getElementById("credits");
+        const didactic = didacticField ? didacticField.value : "";
+        const credits = creditsField ? creditsField.value : "";
+        const numArtworks = parseInt(document.getElementById("num-artworks")?.value, 10) || 0;
+        const didacticWordCount = countWords(didactic);
+        const creditsWordCount = countWords(credits);
+
+        const viewingOrder = viewingOrderInput
+          ? viewingOrderInput.charAt(0).toUpperCase() + viewingOrderInput.slice(1)
+          : "";
+
+        let previewContent = "";
+        if (artistName) {
+          const nameClass = (numArtworks === 1) ? "name single-artwork" : "name multi-artwork";
+          previewContent = `<div class="${nameClass}">${artistName}</div>`;
+        }
+
+        if (viewingOrder) {
+          previewContent += `<div class="viewing-order">${viewingOrder}:</div>`;
+        }
+
+        for (let i = 1; i <= numArtworks; i++) {
+          const title = document.getElementById(`title-${i}`)?.value || "";
+          const year = document.getElementById(`year-${i}`)?.value || "";
+          const materials = document.getElementById(`materials-${i}`)?.value || "";
+          const minVal = parseInt(document.getElementById(`duration-minutes-${i}`)?.value, 10) || 0;
+          const secVal = parseInt(document.getElementById(`duration-seconds-${i}`)?.value, 10) || 0;
+          const formattedSeconds = secVal < 10 ? "0" + secVal : secVal;
+
+          let durationLine = "";
+          if (durationValidity[i]) {
+            if (minVal > 0 || secVal > 0) {
+              const durationString = `${minVal}:${formattedSeconds} mins`;
+              durationLine = `<div class="duration">${durationString}</div>`;
+            }
+          }
+
+          previewContent += `
+            <div class="artwork">
+              <div class="title-year">
+                <span class="title">${title}</span>${year ? ", " + year : ""}
+              </div>
+              <div class="materials">${materials}</div>
+              ${durationLine}
+            </div>
+          `;
+        }
+
+        if (didacticWordCount <= 80 && didactic.trim()) {
+          const sanitizedDidactic = sanitizeParagraphs(didactic);
+          previewContent += `<div class="didactic">${sanitizedDidactic}</div>`;
+        }
+
+        if (creditsWordCount <= 80 && credits.trim()) {
+          const sanitizedCredits = sanitizeParagraphs(credits);
+          previewContent += `<div class="credits">${sanitizedCredits}</div>`;
+        }
+
+        const preview = document.getElementById("preview");
+        preview.innerHTML = previewContent;
+      }
+
+      function validateAndDownload() {
+        document.getElementById('error-artist-name').textContent = '';
+        document.getElementById('error-num-artworks').textContent = '';
+        const viewingOrderError = document.getElementById('error-viewing-order');
+        if (viewingOrderError) viewingOrderError.textContent = '';
+
+        const numArtworksSelect = document.getElementById('num-artworks');
+        let maxArtworks = parseInt(numArtworksSelect.value || 0, 10);
+        if (Number.isNaN(maxArtworks)) maxArtworks = 0;
+        for (let i = 1; i <= maxArtworks; i++) {
+          const titleErr = document.getElementById(`error-title-${i}`);
+          const yearErr = document.getElementById(`error-year-${i}`);
+          const materialsErr = document.getElementById(`error-materials-${i}`);
+          if (titleErr) titleErr.textContent = '';
+          if (yearErr) yearErr.textContent = '';
+          if (materialsErr) materialsErr.textContent = '';
+        }
+
+        let hasError = false;
+
+        const artistNameField = document.getElementById('artist-name');
+        if (!artistNameField.value.trim()) {
+          document.getElementById('error-artist-name').textContent = 'Artist name is required.';
+          hasError = true;
+        }
+
+        if (!numArtworksSelect.value) {
+          document.getElementById('error-num-artworks').textContent = 'Please select the number of artworks.';
+          hasError = true;
+        } else {
+          const numArtworks = parseInt(numArtworksSelect.value, 10);
+          if (numArtworks > 1) {
+            const viewingOrderField = document.getElementById('viewing-order');
+            if (viewingOrderField && !viewingOrderField.value.trim()) {
+              document.getElementById('error-viewing-order').textContent = 'Viewing order is required when adding more than one artwork.';
+              hasError = true;
+            }
+          }
+
+          for (let i = 1; i <= numArtworks; i++) {
+            const titleField = document.getElementById(`title-${i}`);
+            if (titleField && !titleField.value.trim()) {
+              document.getElementById(`error-title-${i}`).textContent = 'Title is required.';
+              hasError = true;
+            }
+
+            const yearField = document.getElementById(`year-${i}`);
+            if (yearField && !yearField.value.trim()) {
+              document.getElementById(`error-year-${i}`).textContent = 'Year is required.';
+              hasError = true;
+            }
+
+            const materialsField = document.getElementById(`materials-${i}`);
+            if (materialsField && !materialsField.value.trim()) {
+              document.getElementById(`error-materials-${i}`).textContent = 'Materials are required.';
+              hasError = true;
+            }
+
+            const durationError = document.getElementById(`error-duration-${i}`).textContent.trim();
+            if (durationError) {
+              hasError = true;
+            }
+          }
+        }
+
+        const didacticErrorText = document.getElementById('error-didactic').textContent;
+        const creditsErrorText = document.getElementById('error-credits').textContent;
+
+        if (didacticErrorText) hasError = true;
+        if (creditsErrorText) hasError = true;
+
+        if (hasError) {
+          return;
+        }
+
+        const previewElement = document.getElementById("preview");
+        const artistName = artistNameField.value || "Artist";
+
+        const currentDate = new Date();
+        const options = { timeZone: "America/Chicago" };
+        const cstDate = new Date(currentDate.toLocaleString("en-US", options));
+        const month = String(cstDate.getMonth() + 1).padStart(2, "0");
+        const day = String(cstDate.getDate()).padStart(2, "0");
+        const year = String(cstDate.getFullYear()).slice(-2);
+        const formattedDate = `${year}${month}${day}`;
+
+        const widthInPixels = 6.5 * 300; 
+        const heightInPixels = (previewElement.offsetHeight / previewElement.offsetWidth) * widthInPixels;
+
+        html2canvas(previewElement, {
+          scale: widthInPixels / previewElement.offsetWidth,
+          backgroundColor: null,
+          width: previewElement.offsetWidth,
+          height: previewElement.offsetHeight,
+        }).then((canvas) => {
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({
+            orientation: previewElement.offsetWidth > previewElement.offsetHeight ? 'landscape' : 'portrait',
+            unit: 'px',
+            format: [widthInPixels, heightInPixels],
+          });
+
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, widthInPixels, heightInPixels);
+          pdf.save(`${artistName}-${formattedDate}-label.pdf`);
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <h1>SAIC Galleries Exhibition Label Generator - UGE</h1>
+    <div class="form-and-preview">
+      <div class="form-container">
+
+        <p><b>* = Required Field<br></b></p>
+
+        <label for="artist-name">Artist Name*</label><br>
+        <input type="text" id="artist-name" placeholder="Your Name" oninput="updatePreview(); clearErrorMessage('artist-name');" required>
+        <span id="error-artist-name" class="error"></span>
+        <br>
+
+        <label for="num-artworks">How many artworks would you like to include on your label?*</label><br>
+        <select id="num-artworks" required oninput="clearErrorMessage('num-artworks');">
+          <option value="" disabled selected>Select number</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="17">17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20</option>
+        </select>
+        <span id="error-num-artworks" class="error"></span>
+        <br>
+
+        <div id="viewing-order-container"></div>
+        <div id="artworks-container"></div>
+      </div>
+
+      <div class="preview-container">
+        <div class="preview-title"><h3>Preview</h3></div>
+        <div class="preview" id="preview"></div>
+        <div class="buttons">
+          <button onclick="validateAndDownload()">Download Label</button>
+        </div>
+        <p style="text-align:center; color:grey">Note: If you click this button but nothing downloads,<br>
+          please check the form on the left for any errors and correct them.<br>
+          The download is only available once all errors have been resolved.</p>
+      </div>
+    </div>
+  </body>
+</html>
